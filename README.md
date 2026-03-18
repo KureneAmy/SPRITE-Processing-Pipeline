@@ -131,7 +131,7 @@ Here stands an throughout workflow of data analysis.
 
 7.   **Required File Structure**
 
-      ```
+      ```bash
       root/
         ├── config.txt
         ├── config.yaml
@@ -152,56 +152,15 @@ Here stands an throughout workflow of data analysis.
         ├── scripts
         │   ├── HiCorrector_1.2
         │   │   ├── bin
-        │   │   │   ├── export_norm_data
-        │   │   │   ├── ic
-        │   │   │   ├── ic_mep
-        │   │   │   ├── ic_mes
-        │   │   │   ├── split_data
-        │   │   │   └── split_data_parallel
         │   │   ├── example
-        │   │   │   ├── contact.matrix
-        │   │   │   ├── run_example_ic_mep.sh
-        │   │   │   ├── run_example_ic_mes.sh
-        │   │   │   ├── run_example_ic.sh
-        │   │   │   └── run_export_norm_data.sh
         │   │   ├── Manual_HiCorrector_1.2.pdf
         │   │   └── src
-        │   │       ├── export_norm_data.c
-        │   │       ├── ic.c
-        │   │       ├── ic_mep.c
-        │   │       ├── ic_mes.c
-        │   │       ├── Makefile
-        │   │       ├── matutils.c
-        │   │       ├── matutils.h
-        │   │       ├── my_getopt-1.5
-        │   │       │   ├── ChangeLog
-        │   │       │   ├── getopt.3
-        │   │       │   ├── getopt.h
-        │   │       │   ├── getopt.txt
-        │   │       │   ├── LICENSE
-        │   │       │   ├── main.c
-        │   │       │   ├── Makefile
-        │   │       │   ├── my_getopt.c
-        │   │       │   ├── my_getopt.h
-        │   │       │   └── README
-        │   │       ├── split_data.c
-        │   │       └── split_data_parallel.c
         │   ├── images
         │   │   └── tag_layout.png
         │   ├── java
         │   │   ├── BarcodeIdentification_v1.2.0.jar
         │   │   ├── example_config.txt
         │   │   └── src
-        │   │       └── edu
-        │   │           └── caltech
-        │   │               └── lncrna
-        │   │                   └── barcode
-        │   │                       └── core
-        │   │                           ├── BarcodeIdentification.java
-        │   │                           ├── Origin.java
-        │   │                           ├── Read.java
-        │   │                           ├── TagCategory.java
-        │   │                           └── Tag.java
         │   ├── python
         │   │   ├── assembly.py
         │   │   ├── cluster.py
@@ -220,9 +179,6 @@ Here stands an throughout workflow of data analysis.
         │   │   ├── get_sprite_contacts.py
         │   │   ├── merge_two_clusters.py
         │   │   └── __pycache__
-        │   │       ├── assembly.cpython-39.pyc
-        │   │       ├── cluster.cpython-39.pyc
-        │   │       └── contact.cpython-39.pyc
         │   └── r
         │       ├── get_cluster_size_distribution.r
         │       ├── plot_chromosome_coverage.r
@@ -249,26 +205,27 @@ Here stands an throughout workflow of data analysis.
       * **Step 1: Edit `config.yaml`**
 
         ```bash
+        # Please use ABSOLUTE PATH for all file paths
         #Location of the container image SPRITE.sif
-        container: "SPRITE.sif"
+        container: "/mnt/zhangam/SPRITE/SPRITE.sif"
         #Location of the config file for barcodeIdentification
-        bID: "./config.txt"
+        bID: "/mnt/zhangam/SPRITE/config.txt"
         #Location of the samples json file produced with fastq2json.py script
-        samples: "./samples.json"
+        samples: "/mnt/zhangam/SPRITE/samples.json"
         #output directory
-        output_dir: ""
+        output_dir: "/mnt/zhangam/SPRITE/"
         #root directory for the scripts
-        scripts_dir: "./scripts"
+        scripts_dir: "/mnt/zhangam/SPRITE/scripts/"
         #Bowtie2 assembly type
         assembly: "hg38"
         #Number of barcodes used
         num_tags: "5"
         #Repeat mask used for filtering DNA contacts
         mask:
-            hg38: "hg38_blacklist_rmsk.milliDivLessThan140.bed.gz"
+            hg38: "/mnt/zhangam/SPRITE/hg38_blacklist_rmsk.milliDivLessThan140.bed.gz"
         #Bowtie2 indexes location with prefix
         bowtie2_index:
-            hg38: "./index/GRCh38.primary_assembly.genome"
+            hg38: "/mnt/zhangam/SPRITE/index/GRCh38.primary_assembly.genome"
         #Setting for mating heatmap matrix
         #Plot a chromosome 'chr1' or plot genome wide 'genome'
         chromosome:
@@ -291,7 +248,26 @@ Here stands an throughout workflow of data analysis.
             - 255
         ```
 
-      * **Step 2: run snakemake**
+	  * **Step 2: Dry-run and dag-make**
+      Here /mnt/zhangam/SPRITE/ represents the root directory.
+
+		```bash
+    	# Dry-run
+        snakemake -np \
+          -s SPRITE.smk \
+          --use-singularity \
+          --singularity-args "--bind /mnt/zhangam/SPRITE/"
+
+		# Dag-make
+		snakemake -s SPRITE.smk \
+		          --use-singularity \
+		          --singularity-args "--bind /mnt/zhangam/SPRITE/" \
+		          --dag  | \
+		dot -Tsvg > dag.svg
+        ```
+		Please try dry-run and dag-make first to check pipeline usability and generate flow diagram.
+
+      * **Step 3: run snakemake**
       Here /mnt/zhangam/SPRITE/ represents the root directory.
 
         ```bash
@@ -299,7 +275,7 @@ Here stands an throughout workflow of data analysis.
         --snakefile SPRITE.smk \
         --use-singularity \
         --cores 8 \
-        --singularity-args "--bind /mnt/zhangam/SPRITE/:/root/" \
+        --singularity-args "--bind /mnt/zhangam/SPRITE/" \
         --configfile config.yaml
         ```
       
@@ -373,22 +349,6 @@ Here stands an throughout workflow of data analysis.
         │   └── SRR7216005.trim_galore.logs
         ├── qc
         │   ├── multiqc_data
-        │   │   ├── bowtie2_se_plot.txt
-        │   │   ├── cutadapt_filtered_reads_plot.txt
-        │   │   ├── cutadapt_trimmed_sequences_plot_3_Counts.txt
-        │   │   ├── cutadapt_trimmed_sequences_plot_3_Obs_Exp.txt
-        │   │   ├── cutadapt_trimmed_sequences_plot_5_Counts.txt
-        │   │   ├── cutadapt_trimmed_sequences_plot_5_Obs_Exp.txt
-        │   │   ├── llms-full.txt
-        │   │   ├── multiqc_bowtie2.txt
-        │   │   ├── multiqc_citations.txt
-        │   │   ├── multiqc_cutadapt.txt
-        │   │   ├── multiqc_data.json
-        │   │   ├── multiqc_general_stats.txt
-        │   │   ├── multiqc.log
-        │   │   ├── multiqc.parquet
-        │   │   ├── multiqc_software_versions.txt
-        │   │   └── multiqc_sources.txt
         │   └── multiqc_report.html
         └── trimmed
             ├── SRR7216005_R1.barcoded.RDtrim.fastq.gz
