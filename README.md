@@ -121,6 +121,8 @@ Here stands an throughout workflow of data analysis.
     singularity exec ../SPRITE.sif seqtk sample -s100 SRR7216005_2.fastq 53086 > SRR7216005_R2.fastq
     pigz -p 8 SRR7216005_R1.fastq
     pigz -p 8 SRR7216005_R2.fastq
+
+    # Please set the names of sample fastq files as "{sample}_R1/2.fastq.gz"
     ```
 
 6.  **Sample Summary**: The location, file name and file pairs are summarised in json format by running this.
