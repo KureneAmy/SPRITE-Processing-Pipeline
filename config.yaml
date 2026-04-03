@@ -38,3 +38,15 @@ max_cluster_size:
 #Max value for heatmap plotting
 max_value:
     - 255
+
+# Report generation settings
+report_config:
+  generate_html: true
+  generate_markdown: true
+  report_title: "SPRITE Analysis Report"
+  institution: "Your Institution"
+  pi_name: ""
+  project_id: ""
+  analysis_date: ""
+  show_contact_map: true
+  heatmap_resolution: 1000000

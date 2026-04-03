@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ report_title }}</title>
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #2d3748;
+      background: #f7f8fc;
+    }
+
+    /* ── Top navigation bar ───────────────────────────────────────── */
+    .topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 56px;
+      background: linear-gradient(135deg, #3b49df 0%, #6c47d6 100%);
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      gap: 16px;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    .topbar .brand {
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: .5px;
+    }
+    .topbar .project-info {
+      margin-left: auto;
+      color: rgba(255,255,255,.85);
+      font-size: 13px;
+      text-align: right;
+    }
+
+    /* ── Layout ───────────────────────────────────────────────────── */
+    .layout {
+      display: flex;
+      margin-top: 56px;
+    }
+
+    /* ── Left sidebar navigation ─────────────────────────────────── */
+    .sidebar {
+      width: 220px;
+      flex-shrink: 0;
+      background: #fff;
+      border-right: 1px solid #e2e8f0;
+      height: calc(100vh - 56px);
+      position: fixed;
+      overflow-y: auto;
+      padding: 16px 0;
+    }
+    .sidebar h3 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: #718096;
+      padding: 8px 20px 4px;
+    }
+    .sidebar a {
+      display: block;
+      padding: 7px 20px;
+      color: #4a5568;
+      text-decoration: none;
+      font-size: 13px;
+      border-left: 3px solid transparent;
+      transition: all .15s;
+    }
+    .sidebar a:hover,
+    .sidebar a.active {
+      color: #3b49df;
+      border-left-color: #3b49df;
+      background: #ebedff;
+    }
+
+    /* ── Right meta panel ─────────────────────────────────────────── */
+    .meta-panel {
+      width: 220px;
+      flex-shrink: 0;
+      background: #fff;
+      border-left: 1px solid #e2e8f0;
+      height: calc(100vh - 56px);
+      position: fixed;
+      right: 0;
+      overflow-y: auto;
+      padding: 20px 16px;
+    }
+    .meta-panel h3 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .7px;
+      color: #718096;
+      margin-bottom: 12px;
+    }
+    .meta-item {
+      margin-bottom: 12px;
+    }
+    .meta-item .label {
+      font-size: 11px;
+      color: #a0aec0;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+    .meta-item .value {
+      font-size: 13px;
+      color: #2d3748;
+      font-weight: 500;
+      word-break: break-all;
+    }
+
+    /* ── Main content ─────────────────────────────────────────────── */
+    .main-content {
+      margin-left: 220px;
+      margin-right: 220px;
+      padding: 32px 40px;
+      min-height: calc(100vh - 56px);
+    }
+
+    /* ── Sections ─────────────────────────────────────────────────── */
+    .section {
+      margin-bottom: 40px;
+    }
+    .section-header {
+      border-bottom: 2px solid #3b49df;
+      padding-bottom: 8px;
+      margin-bottom: 20px;
+    }
+    .section-header h2 {
+      font-size: 22px;
+      color: #3b49df;
+      font-weight: 700;
+    }
+    .section-header p {
+      color: #718096;
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    /* ── Summary cards ────────────────────────────────────────────── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      border-top: 4px solid #3b49df;
+      text-align: center;
+    }
+    .card.purple { border-top-color: #6c47d6; }
+    .card.teal   { border-top-color: #2b9eb3; }
+    .card.indigo { border-top-color: #4c51bf; }
+    .card .card-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #3b49df;
+    }
+    .card.purple .card-value { color: #6c47d6; }
+    .card.teal   .card-value { color: #2b9eb3; }
+    .card.indigo .card-value { color: #4c51bf; }
+    .card .card-label {
+      font-size: 12px;
+      color: #718096;
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+
+    /* ── Tables ───────────────────────────────────────────────────── */
+    .table-wrapper {
+      overflow-x: auto;
+      margin-bottom: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      font-size: 13px;
+    }
+    thead th {
+      background: #3b49df;
+      color: #fff;
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+    tbody tr:nth-child(even) { background: #f7f8fc; }
+    tbody td {
+      padding: 9px 14px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: middle;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+
+    /* ── Content blocks ───────────────────────────────────────────── */
+    .content-block {
+      background: #fff;
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      margin-bottom: 20px;
+    }
+    .content-block h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    /* ── Figures / images ─────────────────────────────────────────── */
+    figure {
+      margin: 16px 0;
+      text-align: center;
+    }
+    figure img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.12);
+    }
+    figcaption {
+      font-size: 12px;
+      color: #718096;
+      margin-top: 8px;
+      font-style: italic;
+    }
+
+    /* ── Collapsible ──────────────────────────────────────────────── */
+    details {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    summary {
+      cursor: pointer;
+      padding: 14px 20px;
+      font-weight: 600;
+      font-size: 14px;
+      color: #2d3748;
+      background: #f7f8fc;
+      border-bottom: 1px solid #e2e8f0;
+      list-style: none;
+      user-select: none;
+    }
+    summary::-webkit-details-marker { display: none; }
+    summary::before {
+      content: '▶ ';
+      font-size: 10px;
+      color: #3b49df;
+    }
+    details[open] summary::before { content: '▼ '; }
+    details .details-body { padding: 16px 20px; }
+
+    /* ── Alert / info boxes ───────────────────────────────────────── */
+    .info-box {
+      background: #ebedff;
+      border-left: 4px solid #3b49df;
+      border-radius: 4px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: #2d3748;
+    }
+
+    /* ── Badge ────────────────────────────────────────────────────── */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-blue   { background: #ebedff; color: #3b49df; }
+    .badge-purple { background: #f0e6ff; color: #6c47d6; }
+    .badge-teal   { background: #e6f7fb; color: #2b9eb3; }
+
+    /* ── Footer ───────────────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      padding: 20px;
+      color: #a0aec0;
+      font-size: 12px;
+      border-top: 1px solid #e2e8f0;
+      margin-top: 40px;
+    }
+
+    /* ── Responsive ───────────────────────────────────────────────── */
+    @media (max-width: 1024px) {
+      .meta-panel { display: none; }
+      .main-content { margin-right: 0; }
+    }
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .main-content { margin-left: 0; padding: 20px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Top bar ──────────────────────────────────────────────────────────── -->
+<nav class="topbar">
+  <span class="brand">&#9642; EasyOmics</span>
+  <span class="badge badge-blue">SPRITE Pipeline</span>
+  <div class="project-info">
+    <div>{{ report_title }}</div>
+    <div>{{ analysis_date }}</div>
+  </div>
+</nav>
+
+<!-- ── Layout wrapper ───────────────────────────────────────────────────── -->
+<div class="layout">
+
+  <!-- ── Left sidebar ─────────────────────────────────────────────────── -->
+  <nav class="sidebar">
+    <h3>Navigation</h3>
+    <a href="#summary">Executive Summary</a>
+    <a href="#quality">Data Quality</a>
+    <a href="#barcode">Barcode Analysis</a>
+    <a href="#cluster">Cluster Analysis</a>
+    <a href="#contacts">3D Chromatin Interactions</a>
+    <a href="#contactmap">Genome-wide Contact Map</a>
+    <a href="#qc">QC Metrics</a>
+    <a href="#methods">Methods</a>
+  </nav>
+
+  <!-- ── Main content ─────────────────────────────────────────────────── -->
+  <main class="main-content">
+
+    <!-- 1. Executive Summary ──────────────────────────────────────────── -->
+    <section class="section" id="summary">
+      <div class="section-header">
+        <h2>&#9679; Executive Summary</h2>
+        <p>Overview of key metrics and analysis outcomes</p>
+      </div>
+
+      <div class="card-grid">
+        <div class="card">
+          <div class="card-value">{{ num_samples }}</div>
+          <div class="card-label">Samples Analysed</div>
+        </div>
+        <div class="card purple">
+          <div class="card-value">{{ assembly }}</div>
+          <div class="card-label">Reference Genome</div>
+        </div>
+        <div class="card teal">
+          <div class="card-value">SPRITE</div>
+          <div class="card-label">Pipeline</div>
+        </div>
+        <div class="card indigo">
+          <div class="card-value">DNA&#8209;DNA</div>
+          <div class="card-label">Interaction Type</div>
+        </div>
+      </div>
+
+      <div class="info-box">
+        This report summarises the results of SPRITE (Split-Pool Recognition of Interactions by
+        Tag Extension) sequencing data processed through the EasyOmics SPRITE pipeline.
+        The analysis detects and quantifies 3D chromatin interactions across the genome using
+        multi-way contact information captured in SPRITE clusters.
+      </div>
+    </section>
+
+    <!-- 2. Data Quality Assessment ───────────────────────────────────── -->
+    <section class="section" id="quality">
+      <div class="section-header">
+        <h2>&#9679; Data Quality Assessment</h2>
+        <p>Read statistics, mapping rates, and ligation efficiency metrics</p>
+      </div>
+
+      <div class="content-block">
+        <h3>Ligation Efficiency</h3>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr><th>Metric</th><th>Value</th></tr>
+            </thead>
+            <tbody>
+              {{ lig_efficiency_rows }}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="content-block">
+        <h3>Sample Summary</h3>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Sample</th>
+                <th>Total Clusters</th>
+                <th>Mean Cluster Size</th>
+                <th>Median Cluster Size</th>
+                <th>Total Raw Contacts</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{ sample_table_rows }}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Barcode Analysis ───────────────────────────────────────────── -->
+    <section class="section" id="barcode">
+      <div class="section-header">
+        <h2>&#9679; Barcode Analysis</h2>
+        <p>Barcode recognition rates and completeness statistics</p>
+      </div>
+
+      <div class="content-block">
+        <h3>Barcode Identification</h3>
+        <p>
+          Barcodes were identified using
+          <code>BarcodeIdentification_v1.2.0.jar</code>.
+          Reads with incomplete barcodes were filtered out before downstream
+          alignment and cluster assignment.
+        </p>
+        <ul style="margin-top:10px;padding-left:20px;color:#4a5568;">
+          <li>Full barcodes retained for downstream analysis</li>
+          <li>Reads with partial barcodes excluded via <code>get_full_barcodes.py</code></li>
+          <li>DPM adapter trimming applied with Cutadapt</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 4. Cluster Analysis ───────────────────────────────────────────── -->
+    <section class="section" id="cluster">
+      <div class="section-header">
+        <h2>&#9679; Cluster Analysis</h2>
+        <p>Cluster size distribution and quality metrics</p>
+      </div>
+
+      <div class="content-block">
+        <h3>Cluster Size Distribution</h3>
+        {{ cluster_sizes_figure }}
+      </div>
+
+      <details>
+        <summary>Per-Sample Cluster Statistics</summary>
+        <div class="details-body">
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Sample</th>
+                  <th>Total Clusters</th>
+                  <th>Mean Size</th>
+                  <th>Median Size</th>
+                </tr>
+              </thead>
+              <tbody>
+                {{ sample_table_rows }}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- 5. 3D Chromatin Interactions ─────────────────────────────────── -->
+    <section class="section" id="contacts">
+      <div class="section-header">
+        <h2>&#9679; 3D Chromatin Interactions</h2>
+        <p>Contact frequency matrices and ICE-normalised heatmaps</p>
+      </div>
+
+      <div class="content-block">
+        <h3>Contact Matrix Overview</h3>
+        <p>
+          DNA&#8209;DNA contacts were derived from SPRITE clusters using
+          <code>get_sprite_contacts.py</code>.
+          Raw contact matrices were ICE-normalised with HiCorrector.
+          Resolution: <strong>1&thinsp;Mb</strong>.
+        </p>
+      </div>
+
+      <div class="content-block">
+        <h3>Contact Heatmaps</h3>
+        {{ heatmap_sections }}
+      </div>
+    </section>
+
+    <!-- 6. Genome-wide Contact Map ────────────────────────────────────── -->
+    <section class="section" id="contactmap">
+      <div class="section-header">
+        <h2>&#9679; Genome-wide Contact Map</h2>
+        <p>Chromosome-level contact patterns across all samples</p>
+      </div>
+
+      <div class="content-block">
+        <h3>Genome-wide Heatmaps</h3>
+        {{ heatmap_sections }}
+      </div>
+    </section>
+
+    <!-- 7. QC Metrics ─────────────────────────────────────────────────── -->
+    <section class="section" id="qc">
+      <div class="section-header">
+        <h2>&#9679; QC Metrics</h2>
+        <p>Comprehensive quality control metrics from MultiQC</p>
+      </div>
+
+      <div class="content-block">
+        <h3>MultiQC Report</h3>
+        <p>
+          A full MultiQC report covering all pipeline steps is available at
+          <code>workup/qc/multiqc_report.html</code>.
+          Key metrics including trimming statistics, alignment rates, and
+          per-sample read depth are summarised there.
+        </p>
+      </div>
+
+      <div class="content-block">
+        <h3>Alignment &amp; Filtering Summary</h3>
+        <ul style="padding-left:20px;color:#4a5568;line-height:1.8;">
+          <li>Reads trimmed with Trim Galore (quality &#8805; 20)</li>
+          <li>Aligned to <strong>{{ assembly }}</strong> with Bowtie2 (MAPQ &#8805; 20)</li>
+          <li>Repeat elements masked using curated blacklist BED file</li>
+          <li>Clusters constructed with <code>get_clusters.py</code></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 8. Methods ────────────────────────────────────────────────────── -->
+    <section class="section" id="methods">
+      <div class="section-header">
+        <h2>&#9679; Methods</h2>
+        <p>Analysis pipeline description and software versions</p>
+      </div>
+
+      <div class="content-block">
+        <h3>Pipeline Overview</h3>
+        <p>
+          The SPRITE (Split-Pool Recognition of Interactions by Tag Extension)
+          pipeline processes paired-end sequencing reads to identify multi-way
+          chromatin contacts. The workflow proceeds as follows:
+        </p>
+        <ol style="padding-left:20px;color:#4a5568;line-height:2;margin-top:8px;">
+          <li>Adapter trimming with <strong>Trim Galore</strong></li>
+          <li>Barcode identification with <strong>BarcodeIdentification v1.2.0</strong></li>
+          <li>Full-barcode filtering and DPM trimming with <strong>Cutadapt</strong></li>
+          <li>DNA alignment with <strong>Bowtie2</strong> (MAPQ &#8805; 20)</li>
+          <li>Chromosome annotation conversion (Ensembl &#8594; UCSC)</li>
+          <li>Repeat-element masking with <strong>bedtools</strong></li>
+          <li>Cluster assembly with <code>get_clusters.py</code></li>
+          <li>Contact matrix construction with <code>get_sprite_contacts.py</code></li>
+          <li>ICE normalisation with <strong>HiCorrector 1.2</strong></li>
+          <li>Heatmap plotting with <strong>R / ggplot2</strong></li>
+        </ol>
+      </div>
+
+      <details>
+        <summary>Software Versions</summary>
+        <div class="details-body">
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr><th>Software</th><th>Version</th><th>Purpose</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Snakemake</td><td>&#8805; 5.x</td><td>Workflow management</td></tr>
+                <tr><td>Trim Galore</td><td>&#8805; 0.6</td><td>Adapter trimming</td></tr>
+                <tr><td>Cutadapt</td><td>&#8805; 3.x</td><td>DPM adapter removal</td></tr>
+                <tr><td>Bowtie2</td><td>&#8805; 2.4</td><td>Short-read alignment</td></tr>
+                <tr><td>SAMtools</td><td>&#8805; 1.12</td><td>BAM processing</td></tr>
+                <tr><td>bedtools</td><td>&#8805; 2.29</td><td>Repeat masking</td></tr>
+                <tr><td>HiCorrector</td><td>1.2</td><td>ICE normalisation</td></tr>
+                <tr><td>MultiQC</td><td>&#8805; 1.11</td><td>QC aggregation</td></tr>
+                <tr><td>R</td><td>&#8805; 4.0</td><td>Visualisation</td></tr>
+                <tr><td>Python</td><td>&#8805; 3.6</td><td>Data processing</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
+      <div class="content-block">
+        <h3>References</h3>
+        <ul style="padding-left:20px;color:#4a5568;line-height:1.8;">
+          <li>
+            Quinodoz SA, et al. (2018). Higher-Order Inter-chromosomal Hubs Shape
+            3D Genome Organization in the Nucleus.
+            <em>Cell</em> 174(3):744&#8209;757.e24.
+          </li>
+          <li>
+            Langmead B &amp; Salzberg SL (2012). Fast gapped-read alignment with Bowtie 2.
+            <em>Nature Methods</em> 9:357&#8209;359.
+          </li>
+          <li>
+            Servant N, et al. (2015). HiC-Pro: an optimized and flexible pipeline for
+            Hi-C data processing. <em>Genome Biology</em> 16:259.
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <footer>
+      Generated by EasyOmics SPRITE Pipeline &bull; {{ analysis_date }} &bull;
+      {{ institution }}
+    </footer>
+
+  </main><!-- /.main-content -->
+
+  <!-- ── Right meta panel ─────────────────────────────────────────────── -->
+  <aside class="meta-panel">
+    <h3>Project Info</h3>
+    <div class="meta-item">
+      <div class="label">Report Title</div>
+      <div class="value">{{ report_title }}</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Project ID</div>
+      <div class="value">{{ project_id }}</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Reference Genome</div>
+      <div class="value">{{ assembly }}</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Report Date</div>
+      <div class="value">{{ analysis_date }}</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Institution</div>
+      <div class="value">{{ institution }}</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">PI / Investigator</div>
+      <div class="value">{{ pi_name }}</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Samples</div>
+      <div class="value">{{ num_samples }}</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Pipeline</div>
+      <div class="value">SPRITE v1.0</div>
+    </div>
+  </aside>
+
+</div><!-- /.layout -->
+
+<script>
+  // Highlight active sidebar link on scroll
+  (function () {
+    var sections = document.querySelectorAll('section[id]');
+    var links    = document.querySelectorAll('.sidebar a');
+
+    function onScroll() {
+      var scrollY = window.scrollY + 80;
+      sections.forEach(function (sec) {
+        if (sec.offsetTop <= scrollY && sec.offsetTop + sec.offsetHeight > scrollY) {
+          links.forEach(function (a) {
+            a.classList.remove('active');
+            if (a.getAttribute('href') === '#' + sec.id) {
+              a.classList.add('active');
+            }
+          });
+        }
+      });
+    }
+    window.addEventListener('scroll', onScroll);
+    onScroll();
+  })();
+</script>
+
+</body>
+</html>
