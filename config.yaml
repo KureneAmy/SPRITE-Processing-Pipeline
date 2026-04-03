@@ -1,0 +1,40 @@
+#Location of the container image SPRITE.sif
+container: "SPRITE.sif"
+#Location of the config file for barcodeIdentification
+bID: "./config.txt"
+#Location of the samples json file produced with fastq2json.py script
+samples: "./samples.json"
+#output directory
+output_dir: ""
+#root directory for the scripts
+scripts_dir: "./scripts/"
+#Bowtie2 assembly type
+assembly: "hg38"
+#Number of barcodes used
+num_tags: "5"
+#Repeat mask used for filtering DNA contacts
+mask:
+    hg38: "hg38_blacklist_rmsk.milliDivLessThan140.bed.gz"
+#Bowtie2 indexes location with prefix
+bowtie2_index:
+    hg38: "./index/GRCh38.primary_assembly.genome"
+#Setting for mating heatmap matrix
+#Plot a chromosome 'chr1' or plot genome wide 'genome'
+chromosome:
+    - genome
+# Options 'none', 'n_minus_one', 'two_over_n'
+downweighting:
+    - two_over_n
+#Number of ICE iterations 
+ice_iterations:
+    - 100
+#Contact matrix resolution in bp
+resolution:
+    - 1000000
+min_cluster_size:
+    - 2
+max_cluster_size:
+    - 1000
+#Max value for heatmap plotting
+max_value:
+    - 255
