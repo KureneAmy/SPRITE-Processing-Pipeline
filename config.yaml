@@ -18,6 +18,8 @@ mask:
 #Bowtie2 indexes location with prefix
 bowtie2_index:
     hg38: "./index/GRCh38.primary_assembly.genome"
+#Adapter sequences for cutadapt (FASTA file path)
+adapter: "dpm96.fasta"
 #Setting for mating heatmap matrix
 #Plot a chromosome 'chr1' or plot genome wide 'genome'
 chromosome:
@@ -41,8 +43,14 @@ max_value:
 
 # Report generation settings
 report_config:
+  # Absolute path to compile_report.py script
+  script: "./scripts/compile_report.py"
   generate_html: true
+  # Absolute path to the HTML report template
+  html_template: "./templates/SPRITE_Report.html"
   generate_markdown: true
+  # Absolute path to the Markdown report template
+  markdown_template: "./templates/SPRITE_Report.md"
   report_title: "SPRITE Analysis Report"
   institution: "Your Institution"
   pi_name: ""

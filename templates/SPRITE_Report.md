@@ -54,6 +54,10 @@ across the genome using multi-way contact information encoded in SPRITE clusters
 
 {{ sample_summary_table }}
 
+### Per-Sample QC Metrics
+
+{{ qc_metrics_table }}
+
 > **Note:** Total clusters and contact counts depend on sequencing depth and
 > library complexity. Mean and median cluster sizes reflect the number of
 > genomic loci co-captured in each SPRITE complex.

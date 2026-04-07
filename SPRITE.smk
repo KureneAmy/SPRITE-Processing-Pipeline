@@ -3,6 +3,7 @@ Author: Peter Chovanec
 Aim: A Snakemake workflow to process DNA-DNA SPRITE-seq data
 Edited by zam Haolab-BIG
 '''
+configfile: "config.yaml"
 
 import json
 import os 
@@ -107,6 +108,7 @@ get_clusters = scripts_dir + "python/get_clusters.py"
 get_cluster_size = scripts_dir + "r/get_cluster_size_distribution.r"
 hicorrector = scripts_dir + "HiCorrector_1.2/bin/ic"
 clusters_heatmap = scripts_dir + "python/get_sprite_contacts.py"
+plot_heatmap_script = scripts_dir + "r/plot_heatmap.R"
 
 
 # Check if file is executable
@@ -162,7 +164,19 @@ PLOT = expand([out_dir + "workup/heatmap/{sample}.DNA.final.pdf",
 
 # Report outputs
 report_config = config.get('report_config', {})
-compile_report = scripts_dir + "compile_report.py"
+compile_report = report_config.get('script')
+generate_html_report = report_config.get('generate_html', True)
+generate_markdown_report = report_config.get('generate_markdown', True)
+html_template = report_config.get('html_template')
+markdown_template = report_config.get('markdown_template')
+
+if not compile_report:
+    sys.exit('report_config.script not specified in config.yaml')
+if generate_html_report and not html_template:
+    sys.exit('report_config.html_template not specified in config.yaml')
+if generate_markdown_report and not markdown_template:
+    sys.exit('report_config.markdown_template not specified in config.yaml')
+
 REPORT_STATS = [out_dir + "reports/report_data.json"]
 REPORT_HTML  = [out_dir + "reports/SPRITE_Analysis_Report.html"]
 REPORT_MD    = [out_dir + "reports/SPRITE_Analysis_Report.md"]
@@ -469,7 +483,7 @@ rule plot_heatmap:
         config["container"]
     shell:
         '''
-        Rscript scripts/r/plot_heatmap.R \
+        Rscript {plot_heatmap_script} \
             -i {input} \
             -m {max_val}
         '''
@@ -532,7 +546,7 @@ rule generate_html_report:
     '''
     input:
         stats    = out_dir + "reports/report_data.json",
-        template = "templates/SPRITE_Report.html",
+        template = html_template,
         clust_png = out_dir + "workup/clusters/cluster_sizes.png",
         heatmaps  = expand(out_dir + "workup/heatmap/{sample}.DNA.final.png",
                            sample=ALL_SAMPLES)
@@ -558,7 +572,7 @@ rule generate_markdown_report:
     '''
     input:
         stats    = out_dir + "reports/report_data.json",
-        template = "templates/SPRITE_Report.md"
+        template = markdown_template
     output:
         out_dir + "reports/SPRITE_Analysis_Report.md"
     log:
@@ -576,12 +590,20 @@ rule generate_markdown_report:
         '''
 
 
+def optional_report_artifacts(wildcards):
+    artifacts = []
+    if generate_html_report:
+        artifacts.append(out_dir + "reports/SPRITE_Analysis_Report.html")
+    if generate_markdown_report:
+        artifacts.append(out_dir + "reports/SPRITE_Analysis_Report.md")
+    return artifacts
+
+
 rule finalize_reports:
     '''Copy heatmap images into the reports directory for self-contained sharing.
     '''
     input:
-        html      = out_dir + "reports/SPRITE_Analysis_Report.html",
-        md        = out_dir + "reports/SPRITE_Analysis_Report.md",
+        reports   = optional_report_artifacts,
         heatmaps  = expand(out_dir + "workup/heatmap/{sample}.DNA.final.png",
                            sample=ALL_SAMPLES),
         clust_png = out_dir + "workup/clusters/cluster_sizes.png"
