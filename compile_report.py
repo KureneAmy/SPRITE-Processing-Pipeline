@@ -45,30 +45,46 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 def parse_ligation_efficiency(filepath):
-    """Parse ligation_efficiency.txt and return a dict of stats."""
-    stats = {}
+    """Parse ligation_efficiency.txt and return an ordered list of stats."""
+    stats = []
     if not filepath or not os.path.isfile(filepath):
         logger.warning("Ligation efficiency file not found: %s", filepath)
         return stats
+
+    def _from_line(line):
+        match = re.match(r'^(?P<count>[\d,]+)\s*\((?P<pct>[\d.]+%)\)\s*(?P<label>.+)$', line)
+        if match:
+            label = match.group('label').strip().rstrip('.')
+            value = f"{match.group('count')} ({match.group('pct')})"
+            return label, value
+        return None
+
     try:
         with open(filepath) as fh:
             for line in fh:
                 line = line.strip()
                 if not line or line.startswith('#'):
                     continue
+
+                parsed = _from_line(line)
+                if parsed:
+                    stats.append(parsed)
+                    continue
+
                 # Common formats:
                 #   KEY: VALUE
                 #   KEY\tVALUE
                 if ':' in line:
                     key, _, val = line.partition(':')
-                    stats[key.strip()] = val.strip()
+                    stats.append((key.strip(), val.strip()))
                 elif '\t' in line:
                     parts = line.split('\t', 1)
-                    stats[parts[0].strip()] = parts[1].strip()
+                    stats.append((parts[0].strip(), parts[1].strip()))
+                else:
+                    stats.append((line, ''))
     except OSError as exc:
         logger.error("Cannot read ligation efficiency file: %s", exc)
     return stats
-
 
 def parse_cluster_file(filepath):
     """Parse a .DNA.clusters file and return basic statistics."""
@@ -111,7 +127,6 @@ def parse_cluster_file(filepath):
         logger.error("Cannot read cluster file: %s", exc)
     return stats
 
-
 def parse_heatmap_matrix(filepath):
     """Read a contact matrix text file and return basic stats."""
     stats = {
@@ -147,7 +162,6 @@ def parse_heatmap_matrix(filepath):
         logger.error("Cannot read heatmap matrix file: %s", exc)
     return stats
 
-
 def image_to_data_uri(filepath, mime_type='image/png'):
     """Encode an image file as a base64 data URI."""
     if not filepath or not os.path.isfile(filepath):
@@ -159,7 +173,6 @@ def image_to_data_uri(filepath, mime_type='image/png'):
     except OSError as exc:
         logger.warning("Cannot encode image %s: %s", filepath, exc)
         return ''
-
 
 def collect_stats(args):
     """Collect all statistics from pipeline outputs and return a dict."""
@@ -177,7 +190,7 @@ def collect_stats(args):
         'assembly': args.assembly,
         'samples': samples,
         'num_samples': len(samples),
-        'ligation_efficiency': {},
+        'ligation_efficiency': [],
         'per_sample': {},
         'cluster_sizes_image': '',
         'heatmap_images': {},
@@ -220,6 +233,28 @@ def collect_stats(args):
 
     return report_data
 
+def rehydrate_images(report_data, output_dir):
+    """Re-embed images when reports are generated from report_data.json."""
+    output_dir = output_dir or 'reports'
+    base_dir = Path(output_dir).resolve().parent
+
+    if report_data.get('cluster_sizes_image') in ('', '<embedded>'):
+        cluster_path = base_dir / 'workup' / 'clusters' / 'cluster_sizes.png'
+        report_data['cluster_sizes_image'] = image_to_data_uri(cluster_path, 'image/png')
+
+    heatmap_dir = base_dir / 'workup' / 'heatmap'
+    samples = report_data.get('samples', [])
+    per_sample = report_data.get('per_sample', {})
+    for sample in samples:
+        sample_data = per_sample.get(sample)
+        if not sample_data:
+            continue
+        if sample_data.get('heatmap_image') in ('', '<embedded>'):
+            heatmap_path = heatmap_dir / f'{sample}.DNA.final.png'
+            sample_data['heatmap_image'] = image_to_data_uri(heatmap_path, 'image/png')
+
+    return report_data
+
 
 # ---------------------------------------------------------------------------
 # Report rendering
@@ -250,16 +285,27 @@ def _render_template(template_path, context):
             content = content.replace('{{ ' + key + ' }}', str(value))
         return content
 
-
 def build_html_context(report_data):
     """Build the Jinja2/substitution context for the HTML template."""
     ctx = dict(report_data)
 
     # Flatten ligation efficiency
-    lig = report_data.get('ligation_efficiency', {})
+    lig = report_data.get('ligation_efficiency', [])
+    lig_items = []
+    if isinstance(lig, dict):
+        lig_items = list(lig.items())
+    elif isinstance(lig, list):
+        for item in lig:
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                lig_items.append((item[0], item[1]))
+            elif isinstance(item, (list, tuple)) and len(item) == 1:
+                lig_items.append((item[0], ''))
+            else:
+                lig_items.append((item, ''))
+
     ctx['lig_efficiency_rows'] = ''.join(
-        f'<tr><td>{k}</td><td>{v}</td></tr>' for k, v in lig.items()
-    ) if lig else '<tr><td colspan="2"><em>No data available</em></td></tr>'
+        f'<tr><td>{k}</td><td>{v}</td></tr>' for k, v in lig_items
+    ) if lig_items else '<tr><td colspan="2"><em>No data available</em></td></tr>'
 
     # Sample summary table rows
     sample_rows = []
@@ -314,14 +360,14 @@ def build_html_context(report_data):
 
     # 3-column QC table: Sample | Metric | Value
     qc_metrics_order = [
-        ('Total Clusters',      lambda cs, rc, ic: cs.get('total_clusters', 'N/A')),
-        ('Mean Cluster Size',   lambda cs, rc, ic: cs.get('mean_size', 'N/A')),
-        ('Median Cluster Size', lambda cs, rc, ic: cs.get('median_size', 'N/A')),
-        ('Total Raw Contacts',  lambda cs, rc, ic: rc.get('total_contacts', 'N/A')),
-        ('Non-zero Bins (raw)', lambda cs, rc, ic: rc.get('non_zero_bins', 'N/A')),
-        ('Max Raw Contact',     lambda cs, rc, ic: rc.get('max_contact', 'N/A')),
-        ('Total ICE Contacts',  lambda cs, rc, ic: ic.get('total_contacts', 'N/A')),
-        ('Max ICE Contact',     lambda cs, rc, ic: ic.get('max_contact', 'N/A')),
+        ('Total Clusters',      lambda cs, rc, ic: cs.get('total_clusters', 'N/A')), 
+        ('Mean Cluster Size',   lambda cs, rc, ic: cs.get('mean_size', 'N/A')), 
+        ('Median Cluster Size', lambda cs, rc, ic: cs.get('median_size', 'N/A')), 
+        ('Total Raw Contacts',  lambda cs, rc, ic: rc.get('total_contacts', 'N/A')), 
+        ('Non-zero Bins (raw)', lambda cs, rc, ic: rc.get('non_zero_bins', 'N/A')), 
+        ('Max Raw Contact',     lambda cs, rc, ic: rc.get('max_contact', 'N/A')), 
+        ('Total ICE Contacts',  lambda cs, rc, ic: ic.get('total_contacts', 'N/A')), 
+        ('Max ICE Contact',     lambda cs, rc, ic: ic.get('max_contact', 'N/A')), 
     ]
     qc_rows = []
     for sample, data in report_data.get('per_sample', {}).items():
@@ -337,24 +383,38 @@ def build_html_context(report_data):
 
     return ctx
 
-
 def build_md_context(report_data):
     """Build the substitution context for the Markdown template."""
     ctx = dict(report_data)
 
     # Ligation efficiency table
-    lig = report_data.get('ligation_efficiency', {})
-    if lig:
-        header = '| Metric | Value |\n|--------|-------|\n'
-        rows = '\n'.join(f'| {k} | {v} |' for k, v in lig.items())
+    lig = report_data.get('ligation_efficiency', [])
+    lig_items = []
+    if isinstance(lig, dict):
+        lig_items = list(lig.items())
+    elif isinstance(lig, list):
+        for item in lig:
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                lig_items.append((item[0], item[1]))
+            elif isinstance(item, (list, tuple)) and len(item) == 1:
+                lig_items.append((item[0], ''))
+            else:
+                lig_items.append((item, ''))
+
+    if lig_items:
+        header = '| Metric | Value |
+|--------|-------|
+'
+        rows = '\n'.join(f'| {k} | {v} |' for k, v in lig_items)
         ctx['ligation_efficiency_table'] = header + rows
     else:
         ctx['ligation_efficiency_table'] = '_No ligation efficiency data available._'
 
     # Sample summary table
     header = (
-        '| Sample | Total Clusters | Mean Size | Median Size | Total Raw Contacts |\n'
-        '|--------|---------------|-----------|-------------|--------------------|\n'
+        '| Sample | Total Clusters | Mean Size | Median Size | Total Raw Contacts |
+'        '|--------|---------------|-----------|-------------|--------------------|
+'
     )
     rows = []
     for sample, data in report_data.get('per_sample', {}).items():
@@ -365,7 +425,7 @@ def build_md_context(report_data):
             f'| {cs.get("total_clusters", "N/A")} '
             f'| {cs.get("mean_size", "N/A")} '
             f'| {cs.get("median_size", "N/A")} '
-            f'| {rc.get("total_contacts", "N/A")} |'
+            f'| {rc.get("total_contacts", "N/A")} |
         )
     ctx['sample_summary_table'] = header + '\n'.join(rows) if rows else (
         '_No sample data available._'
@@ -376,8 +436,9 @@ def build_md_context(report_data):
 
     # 3-column QC table for Markdown
     qc_header = (
-        '| Sample | Metric | Value |\n'
-        '|--------|--------|-------|\n'
+        '| Sample | Metric | Value |
+'        '|--------|--------|-------|
+'
     )
     qc_rows = []
     for sample, data in report_data.get('per_sample', {}).items():
@@ -385,14 +446,14 @@ def build_md_context(report_data):
         rc = data.get('raw_contacts', {})
         ic = data.get('iced_contacts', {})
         for metric_name, val in [
-            ('Total Clusters',      cs.get('total_clusters', 'N/A')),
-            ('Mean Cluster Size',   cs.get('mean_size', 'N/A')),
-            ('Median Cluster Size', cs.get('median_size', 'N/A')),
-            ('Total Raw Contacts',  rc.get('total_contacts', 'N/A')),
-            ('Non-zero Bins (raw)', rc.get('non_zero_bins', 'N/A')),
-            ('Max Raw Contact',     rc.get('max_contact', 'N/A')),
-            ('Total ICE Contacts',  ic.get('total_contacts', 'N/A')),
-            ('Max ICE Contact',     ic.get('max_contact', 'N/A')),
+            ('Total Clusters',      cs.get('total_clusters', 'N/A')), 
+            ('Mean Cluster Size',   cs.get('mean_size', 'N/A')), 
+            ('Median Cluster Size', cs.get('median_size', 'N/A')), 
+            ('Total Raw Contacts',  rc.get('total_contacts', 'N/A')), 
+            ('Non-zero Bins (raw)', rc.get('non_zero_bins', 'N/A')), 
+            ('Max Raw Contact',     rc.get('max_contact', 'N/A')), 
+            ('Total ICE Contacts',  ic.get('total_contacts', 'N/A')), 
+            ('Max ICE Contact',     ic.get('max_contact', 'N/A')), 
         ]:
             qc_rows.append(f'| {sample} | {metric_name} | {val} |')
     ctx['qc_metrics_table'] = qc_header + '\n'.join(qc_rows) if qc_rows else (
@@ -400,7 +461,6 @@ def build_md_context(report_data):
     )
 
     return ctx
-
 
 def generate_report(report_data, html_template, md_template, output_dir):
     """Render and write HTML and Markdown reports."""
@@ -441,7 +501,6 @@ def generate_report(report_data, html_template, md_template, output_dir):
         logger.warning("Markdown template not found: %s", md_template)
 
     return html_out, md_out, json_out
-
 
 # ---------------------------------------------------------------------------
 # CLI
@@ -496,7 +555,6 @@ def parse_args(argv=None):
 
     return parser.parse_args(argv)
 
-
 def main(argv=None):
     args = parse_args(argv)
 
@@ -504,6 +562,7 @@ def main(argv=None):
         logger.info("Loading pre-computed stats from %s", args.stats)
         with open(args.stats) as fh:
             report_data = json.load(fh)
+        report_data = rehydrate_images(report_data, args.output_dir)
     else:
         report_data = collect_stats(args)
 
@@ -514,7 +573,6 @@ def main(argv=None):
         output_dir=args.output_dir,
     )
     logger.info("Report generation complete.")
-
 
 if __name__ == '__main__':
     main()
