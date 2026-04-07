@@ -211,6 +211,32 @@
     }
     tbody tr:last-child td { border-bottom: none; }
 
+    /* ── 三线表样式（用于 QC 表格） ───────────────────────────────── */
+    .three-line-table {
+      border-collapse: collapse;
+      background: #fff;
+      box-shadow: none;
+      border-radius: 0;
+    }
+    .three-line-table thead th {
+      background: transparent;
+      color: #2d3748;
+      border-top: 2px solid #2d3748;
+      border-bottom: 1px solid #2d3748;
+      text-transform: none;
+      letter-spacing: 0;
+      font-size: 13px;
+    }
+    .three-line-table tbody tr:nth-child(even) {
+      background: transparent;
+    }
+    .three-line-table tbody td {
+      border-bottom: none;
+    }
+    .three-line-table tbody tr:last-child td {
+      border-bottom: 2px solid #2d3748;
+    }
+
     /* ── Content blocks ───────────────────────────────────────────── */
     .content-block {
       background: #fff;
@@ -427,7 +453,7 @@
       <div class="content-block">
         <h3>QC Metrics by Sample</h3>
         <div class="table-wrapper">
-          <table>
+          <table class="three-line-table">
             <thead>
               <tr>
                 <th>Sample</th>
