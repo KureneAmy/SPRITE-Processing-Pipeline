@@ -1,3 +1,4 @@
+# Please use ABSOLUTE PATH for all file paths
 #Location of the container image SPRITE.sif
 container: "SPRITE.sif"
 #Location of the config file for barcodeIdentification

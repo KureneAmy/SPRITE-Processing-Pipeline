@@ -106,10 +106,10 @@ split_fq = scripts_dir + "python/get_full_barcodes.py"
 add_chr = scripts_dir + "python/ensembl2ucsc.py"
 get_clusters = scripts_dir + "python/get_clusters.py"
 get_cluster_size = scripts_dir + "r/get_cluster_size_distribution.r"
+plot_heatmap_script = scripts_dir + "r/plot_heatmap.R"
 hicorrector = scripts_dir + "HiCorrector_1.2/bin/ic"
 clusters_heatmap = scripts_dir + "python/get_sprite_contacts.py"
-plot_heatmap_script = scripts_dir + "r/plot_heatmap.R"
-
+adapter = config['adapter']
 
 # Check if file is executable
 hicorrector_path = os.path.abspath(hicorrector)
@@ -317,9 +317,9 @@ rule cutadapt:
         fastq=out_dir + "workup/trimmed/{sample}_R1.barcoded.RDtrim.fastq.gz",
         qc=out_dir + "workup/trimmed/{sample}_R1.barcoded.RDtrim.qc.txt"
     params:
-        "-a GATCGGAAGAG -g file:dpm96.fasta"
+        adapter_args=lambda wildcards: f"-a GATCGGAAGAG -g file:{adapter}"
     log:
-        "logs/cutadapt/{sample}.log"
+        out_dir + "workup/logs/{sample}.cutadapt.log"
     threads: 
         10
     container:
@@ -327,11 +327,11 @@ rule cutadapt:
     shell:
         '''
         cutadapt \
-        {params} \
+        {params.adapter_args} \
         -o {output.fastq} \
         -j {threads} \
         {input} \
-        1> {output.qc} 2> {log}
+        1> {output.qc} 2> "{log}"
         '''
 
 
@@ -419,7 +419,9 @@ rule multiqc:
         '''
         if [ ! -f {output} ]
         then
-            multiqc {out_dir}workup -o {out_dir}workup/qc
+            multiqc {out_dir}workup -o {out_dir}workup/qc > "{log}" 2>&1
+        else
+            echo "MultiQC report already exists: {output}" > "{log}"
         fi
         '''
 
@@ -436,9 +438,9 @@ rule plot_cluster_size:
         config["container"]
     shell:
         '''
-        Rscript scripts/r/get_cluster_size_distribution.r \
+        Rscript {get_cluster_size} \
             {out_dir}workup/clusters/ \
-            DNA.clusters
+            DNA.clusters > "{log}" 2>&1
         '''
 
 rule make_heatmap_matrix:
@@ -468,7 +470,7 @@ rule make_heatmap_matrix:
         --resolution {resolution} \
         --iterations {ice_iterations} \
         --max_cluster_size {max_cluster_size} \
-        --min_cluster_size {min_cluster_size}
+        --min_cluster_size {min_cluster_size} > "{log}" 2>&1
         '''
 
 rule plot_heatmap:
@@ -485,7 +487,7 @@ rule plot_heatmap:
         '''
         Rscript {plot_heatmap_script} \
             -i {input} \
-            -m {max_val}
+            -m {max_val} > "{log}" 2>&1
         '''
 
 ################################################################################

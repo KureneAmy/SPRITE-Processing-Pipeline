@@ -125,13 +125,27 @@ Here stands an throughout workflow of data analysis.
     # Please set the names of sample fastq files as "{sample}_R1/2.fastq.gz"
     ```
 
-6.  **Sample Summary**: The location, file name and file pairs are summarised in json format by running this.
+6.  **Sample Summary**: The location, file name and file pairs are summarised in json format by running this. Remember to run under the path you run snakemake.
 
       ```bash
+      cd /path/to/work/dir/running/smk
       singularity exec SPRITE.sif python fastq2json.py --fastq_dir samples
       ```
+      
+7.  **Check execution permission**: You will need execution permission for file "/path/to/scripts/HiCorrector_1.2/bin/ic". Please ensure it before running the pipeline.
 
-7.   **Required File Structure**
+      ```bash
+      # Check current file permissions (look for 'x' in the output)
+	  ls -l "/path/to/scripts/HiCorrector_1.2/bin/ic"
+		
+	  # Add executable permission for all users (owner, group, others)
+	  chmod +x "/path/to/scripts/HiCorrector_1.2/bin/ic"
+		
+	  # Alternative: Add executable permission only for the owner (more secure)
+	  # chmod u+x "/path/to/scripts/HiCorrector_1.2/bin/ic"
+      ```
+
+8.   **Required File Structure**
 
       ```bash
       root/
