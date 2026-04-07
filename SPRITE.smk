@@ -3,6 +3,7 @@ Author: Peter Chovanec
 Aim: A Snakemake workflow to process DNA-DNA SPRITE-seq data
 Edited by zam Haolab-BIG
 '''
+configfile: "config.yaml"
 
 import json
 import os 
@@ -105,9 +106,10 @@ split_fq = scripts_dir + "python/get_full_barcodes.py"
 add_chr = scripts_dir + "python/ensembl2ucsc.py"
 get_clusters = scripts_dir + "python/get_clusters.py"
 get_cluster_size = scripts_dir + "r/get_cluster_size_distribution.r"
+plot_heatmap_script = scripts_dir + "r/plot_heatmap.R"
 hicorrector = scripts_dir + "HiCorrector_1.2/bin/ic"
 clusters_heatmap = scripts_dir + "python/get_sprite_contacts.py"
-
+adapter = config['adapter']
 
 # Check if file is executable
 hicorrector_path = os.path.abspath(hicorrector)
@@ -160,6 +162,25 @@ CLUSTERS_HP = expand([out_dir + "workup/heatmap/{sample}.DNA.iced.txt",
 PLOT = expand([out_dir + "workup/heatmap/{sample}.DNA.final.pdf",
         out_dir + "workup/heatmap/{sample}.DNA.final.png"], sample=ALL_SAMPLES)
 
+# Report outputs
+report_config = config.get('report_config', {})
+compile_report = report_config.get('script')
+generate_html_report = report_config.get('generate_html', True)
+generate_markdown_report = report_config.get('generate_markdown', True)
+html_template = report_config.get('html_template')
+markdown_template = report_config.get('markdown_template')
+
+if not compile_report:
+    sys.exit('report_config.script not specified in config.yaml')
+if generate_html_report and not html_template:
+    sys.exit('report_config.html_template not specified in config.yaml')
+if generate_markdown_report and not markdown_template:
+    sys.exit('report_config.markdown_template not specified in config.yaml')
+
+REPORT_STATS = [out_dir + "reports/report_data.json"]
+REPORT_HTML  = [out_dir + "reports/SPRITE_Analysis_Report.html"]
+REPORT_MD    = [out_dir + "reports/SPRITE_Analysis_Report.md"]
+
 
 ################################################################################
 # Execute before workflow starts
@@ -174,7 +195,7 @@ onstart:
 rule all:
     input: CONFIG + ALL_FASTQ + TRIM + TRIM_LOG + BARCODE_FULL + BARCODEID + LE_LOG_ALL +
            TRIM_RD + Bt2_DNA_ALIGN + CHR_DNA + MASKED + CLUSTERS + MULTI_QC + CLUSTERS_PLOT +
-           CLUSTERS_HP + PLOT
+           CLUSTERS_HP + PLOT + REPORT_STATS + REPORT_HTML + REPORT_MD
 
 ################################################################################
 # Log
@@ -296,9 +317,9 @@ rule cutadapt:
         fastq=out_dir + "workup/trimmed/{sample}_R1.barcoded.RDtrim.fastq.gz",
         qc=out_dir + "workup/trimmed/{sample}_R1.barcoded.RDtrim.qc.txt"
     params:
-        "-a GATCGGAAGAG -g file:dpm96.fasta"
+        adapter_args=lambda wildcards: f"-a GATCGGAAGAG -g file:{adapter}"
     log:
-        "logs/cutadapt/{sample}.log"
+        out_dir + "workup/logs/{sample}.cutadapt.log"
     threads: 
         10
     container:
@@ -306,11 +327,11 @@ rule cutadapt:
     shell:
         '''
         cutadapt \
-        {params} \
+        {params.adapter_args} \
         -o {output.fastq} \
         -j {threads} \
         {input} \
-        1> {output.qc} 2> {log}
+        1> {output.qc} 2> "{log}"
         '''
 
 
@@ -398,7 +419,9 @@ rule multiqc:
         '''
         if [ ! -f {output} ]
         then
-            multiqc {out_dir}workup -o {out_dir}workup/qc
+            multiqc {out_dir}workup -o {out_dir}workup/qc > "{log}" 2>&1
+        else
+            echo "MultiQC report already exists: {output}" > "{log}"
         fi
         '''
 
@@ -415,9 +438,9 @@ rule plot_cluster_size:
         config["container"]
     shell:
         '''
-        Rscript scripts/r/get_cluster_size_distribution.r \
+        Rscript {get_cluster_size} \
             {out_dir}workup/clusters/ \
-            DNA.clusters
+            DNA.clusters > "{log}" 2>&1
         '''
 
 rule make_heatmap_matrix:
@@ -447,7 +470,7 @@ rule make_heatmap_matrix:
         --resolution {resolution} \
         --iterations {ice_iterations} \
         --max_cluster_size {max_cluster_size} \
-        --min_cluster_size {min_cluster_size}
+        --min_cluster_size {min_cluster_size} > "{log}" 2>&1
         '''
 
 rule plot_heatmap:
@@ -462,7 +485,140 @@ rule plot_heatmap:
         config["container"]
     shell:
         '''
-        Rscript scripts/r/plot_heatmap.R \
+        Rscript {plot_heatmap_script} \
             -i {input} \
-            -m {max_val}
+            -m {max_val} > "{log}" 2>&1
+        '''
+
+################################################################################
+# Report generation rules
+################################################################################
+
+rule collect_report_stats:
+    '''Collect all pipeline output statistics into a single JSON file.
+    '''
+    input:
+        multiqc   = out_dir + "workup/qc/multiqc_report.html",
+        lig_eff   = out_dir + "workup/ligation_efficiency.txt",
+        clusters  = expand(out_dir + "workup/clusters/{sample}.DNA.clusters",
+                           sample=ALL_SAMPLES),
+        heatmaps  = expand(out_dir + "workup/heatmap/{sample}.DNA.raw.txt",
+                           sample=ALL_SAMPLES),
+        clust_png = out_dir + "workup/clusters/cluster_sizes.png"
+    output:
+        out_dir + "reports/report_data.json"
+    params:
+        samples_arg      = ' '.join(ALL_SAMPLES),
+        clusters_dir     = out_dir + "workup/clusters",
+        heatmap_dir      = out_dir + "workup/heatmap",
+        report_title     = report_config.get('report_title', 'SPRITE Analysis Report'),
+        institution      = report_config.get('institution', ''),
+        pi_name          = report_config.get('pi_name', ''),
+        project_id       = report_config.get('project_id', ''),
+        analysis_date    = report_config.get('analysis_date', ''),
+        assembly         = assembly
+    log:
+        out_dir + "workup/logs/collect_report_stats.log"
+    container:
+        config["container"]
+    shell:
+        '''
+        python {compile_report} \
+            --samples {params.samples_arg} \
+            --ligation_efficiency {input.lig_eff} \
+            --clusters_dir {params.clusters_dir} \
+            --heatmap_dir {params.heatmap_dir} \
+            --cluster_sizes_png {input.clust_png} \
+            --multiqc_report {input.multiqc} \
+            --output_dir {out_dir}reports \
+            --report_title "{params.report_title}" \
+            --institution "{params.institution}" \
+            --pi_name "{params.pi_name}" \
+            --project_id "{params.project_id}" \
+            --analysis_date "{params.analysis_date}" \
+            --assembly {params.assembly} \
+            --html_template /dev/null \
+            --md_template /dev/null \
+            &> {log}
+        '''
+
+
+rule generate_html_report:
+    '''Generate the professional HTML analysis report.
+    '''
+    input:
+        stats    = out_dir + "reports/report_data.json",
+        template = html_template,
+        clust_png = out_dir + "workup/clusters/cluster_sizes.png",
+        heatmaps  = expand(out_dir + "workup/heatmap/{sample}.DNA.final.png",
+                           sample=ALL_SAMPLES)
+    output:
+        out_dir + "reports/SPRITE_Analysis_Report.html"
+    log:
+        out_dir + "workup/logs/generate_html_report.log"
+    container:
+        config["container"]
+    shell:
+        '''
+        python {compile_report} \
+            --stats {input.stats} \
+            --html_template {input.template} \
+            --md_template /dev/null \
+            --output_dir {out_dir}reports \
+            &> {log}
+        '''
+
+
+rule generate_markdown_report:
+    '''Generate the Markdown analysis report.
+    '''
+    input:
+        stats    = out_dir + "reports/report_data.json",
+        template = markdown_template
+    output:
+        out_dir + "reports/SPRITE_Analysis_Report.md"
+    log:
+        out_dir + "workup/logs/generate_markdown_report.log"
+    container:
+        config["container"]
+    shell:
+        '''
+        python {compile_report} \
+            --stats {input.stats} \
+            --html_template /dev/null \
+            --md_template {input.template} \
+            --output_dir {out_dir}reports \
+            &> {log}
+        '''
+
+
+def optional_report_artifacts(wildcards):
+    artifacts = []
+    if generate_html_report:
+        artifacts.append(out_dir + "reports/SPRITE_Analysis_Report.html")
+    if generate_markdown_report:
+        artifacts.append(out_dir + "reports/SPRITE_Analysis_Report.md")
+    return artifacts
+
+
+rule finalize_reports:
+    '''Copy heatmap images into the reports directory for self-contained sharing.
+    '''
+    input:
+        reports   = optional_report_artifacts,
+        heatmaps  = expand(out_dir + "workup/heatmap/{sample}.DNA.final.png",
+                           sample=ALL_SAMPLES),
+        clust_png = out_dir + "workup/clusters/cluster_sizes.png"
+    output:
+        directory(out_dir + "reports/heatmaps")
+    log:
+        out_dir + "workup/logs/finalize_reports.log"
+    container:
+        config["container"]
+    shell:
+        '''
+        mkdir -p {out_dir}reports/heatmaps
+        cp {input.heatmaps} {out_dir}reports/heatmaps/ 2>> {log} || true
+        cp {input.clust_png} {out_dir}reports/heatmaps/ 2>> {log} || true
+        echo "Reports finalised in {out_dir}reports/" >> {log}
         '''
