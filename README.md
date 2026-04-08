@@ -105,7 +105,7 @@ Here stands an throughout workflow of data analysis.
       rm GRCh38.primary_assembly.genome.fa
       ```
 
-5.  **Data Preparation**: The data run by this pipeline is from SRR7216005 in the SRA database.The specific processing method is as follows
+5.  **Data Preparation**: The test data run by this pipeline is from SRR7216005 in the SRA database.The specific processing method is as follows
 
     ```bash
     # Download the test sra data
@@ -262,6 +262,21 @@ Here stands an throughout workflow of data analysis.
         #Max value for heatmap plotting
         max_value:
             - 255
+
+        # Report generation settings
+		report_config:
+		  script: "/mnt/zhangam/SPRITE/Scripts/compile_report.py"
+		  generate_html: true
+		  html_template: "/mnt/zhangam/SPRITE/Scripts/SPRITE_Report.html"
+		  generate_markdown: true
+		  markdown_template: "/mnt/zhangam/SPRITE/Scripts/SPRITE_Report.md"
+		  report_title: "SPRITE Analysis Report"
+		  institution: "Your Institution"
+		  pi_name: ""
+		  project_id: ""
+		  analysis_date: ""
+		  show_contact_map: true
+		  heatmap_resolution: 1000000
         ```
 
 	  * **Step 2: Dry-run and dag-make**
